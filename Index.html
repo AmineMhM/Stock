@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Scanner Stock Pro - DZD</title>
+    <!-- Import de la bibliothèque de reconnaissance de texte (Tesseract.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --primary: #2563eb;
+            --success: #16a34a;
+            --warning: #ea580c;
+            --danger: #dc2626;
+            --text: #1e293b;
+            --text-light: #64748b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 22px;
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-sizing: border-box;
+        }
+
+        .btn-scan {
+            background-color: var(--success);
+            margin-top: 10px;
+        }
+
+        .btn-secondary {
+            background-color: var(--warning);
+            font-size: 14px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .btn:disabled {
+            background-color: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        /* Style du Tableau de Bord */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-box.full-width {
+            grid-column: span 2;
+            background: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
+        .stat-val {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        /* Résultats du Scan */
+        .result-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--success);
+            text-align: center;
+            margin-top: 0;
+        }
+
+        .product-name {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .info-item {
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .info-label {
+            color: var(--text-light);
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            font-weight: bold;
+            font-size: 15px;
+            margin-top: 2px;
+        }
+
+        .total-item-box {
+            grid-column: span 2;
+            background: #f0fdf4;
+            border: 1px dashed var(--success);
+            text-align: center;
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            color: var(--warning);
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .file-status {
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-light);
+            margin-top: 5px;
+        }
+
+        /* Zone de recherche manuelle permanente */
+        .manual-input-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        .input-text {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            text-align: center;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📦 Scanner Stock Pro</h1>
+
+    <!-- ÉTAPE 1 : Chargement Fichier & Dashboard -->
+    <div class="card">
+        <div class="file-input-wrapper">
+            <button class="btn">📁 Charger le fichier stock.txt</button>
+            <input type="file" id="file-picker" accept=".txt">
+        </div>
+        <div id="file-name" class="file-status">Aucun fichier chargé</div>
+        
+        <!-- Tableau de bord global -->
+        <div id="dashboard" style="display: none; margin-top: 15px;">
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 12px;">
+            <b style="font-size: 14px; color: var(--text-light);">TABLEAU DE BORD GLOBAL :</b>
+            <div class="dashboard-grid">
+                <div class="stat-box">
+                    <div class="info-label">Items Stock 0</div>
+                    <div id="stat-zero" class="stat-val" style="color: var(--danger);">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="info-label">Items en Stock</div>
+                    <div id="stat-actif" class="stat-val" style="color: var(--success);">0</div>
+                </div>
+                <div class="stat-box full-width">
+                    <div class="info-label">Valeur Totale du Stock</div>
+                    <div id="stat-valeur-totale" class="stat-val" style="color: var(--primary); font-size: 22px;">0.00 DZD</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ÉTAPE 2 : Recherche Manuelle ET Scan Photo -->
+    <div class="card" style="text-align: center;">
+        
+        <!-- RECHERCHE MANUELLE (Désormais affichée au-dessus en permanence) -->
+        <div class="manual-input-box">
+            <b style="font-size: 14px; color: var(--text-light);">🔍 RECHERCHE MANUELLE</b>
+            <input type="text" id="manual-code-input" class="input-text" placeholder="Entrez le code (Ex: 123Z123456)">
+            <button id="btn-valider-manuel" class="btn btn-secondary" disabled>Rechercher ce code</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+
+        <!-- SCANNER PHOTO -->
+        <b style="font-size: 14px; color: var(--text-light); display: block; text-align: left; margin-bottom: 5px;">📷 SCANNER PAR PHOTO</b>
+        <div class="file-input-wrapper">
+            <button id="btn-scan" class="btn btn-scan" disabled>Prendre une Photo du Code</button>
+            <input type="file" id="camera-picker" accept="image/*" capture="environment" disabled>
+        </div>
+        <div id="loading">Analyse et traitement d'image en cours... ⏳</div>
+    </div>
+
+    <!-- ÉTAPE 3 : Affichage du produit trouvé -->
+    <div id="result-card" class="card" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0;">
+        <p class="result-title">🎯 PRODUIT TROUVÉ</p>
+        <div id="prod-libelle" class="product-name">-</div>
+        
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Code scanné</div>
+                <div id="prod-code" class="info-value">-</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Emplacement</div>
+                <div id="prod-emplacement" class="info-value" style="color: var(--warning);">-</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Prix Unitaire</div>
+                <div id="prod-prix" class="info-value">-</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Stock Actuel</div>
+                <div id="prod-quantite" class="info-value" style="color: var(--primary);">-</div>
+            </div>
+            <div class="info-item total-item-box">
+                <div class="info-label" style="color: var(--success);">Valeur Totale de cet Item</div>
+                <div id="prod-valeur-totale" class="info-value" style="color: var(--success); font-size: 18px;">0.00 DZD</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Canvas invisible servant à optimiser la netteté de l'image pour l'OCR -->
+<canvas id="preprocess-canvas" style="display:none;"></canvas>
+
+<script>
+    let catalogue = {};
+
+    // Éléments HTML
+    const filePicker = document.getElementById('file-picker');
+    const fileNameDiv = document.getElementById('file-name');
+    const cameraPicker = document.getElementById('camera-picker');
+    const btnScan = document.getElementById('btn-scan');
+    const loadingDiv = document.getElementById('loading');
+    const resultCard = document.getElementById('result-card');
+
+    // Éléments Recherche Manuelle
+    const manualCodeInput = document.getElementById('manual-code-input');
+    const btnValiderManuel = document.getElementById('btn-valider-manuel');
+
+    // Dashboard HTML
+    const dashboard = document.getElementById('dashboard');
+    const statZero = document.getElementById('stat-zero');
+    const statActif = document.getElementById('stat-actif');
+    const statValeurTotale = document.getElementById('stat-valeur-totale');
+
+    // Fiche Produit HTML
+    const prodLibelle = document.getElementById('prod-libelle');
+    const prodCode = document.getElementById('prod-code');
+    const prodEmplacement = document.getElementById('prod-emplacement');
+    const prodPrix = document.getElementById('prod-prix');
+    const prodQuantite = document.getElementById('prod-quantite');
+    const prodValeurTotale = document.getElementById('prod-valeur-totale');
+
+    // Fonction utilitaire pour formater en DZD
+    function formaterDZD(montant) {
+        return montant.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " DZD";
+    }
+
+    // 1. LECTURE DU FICHIER TEXTE
+    filePicker.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        fileNameDiv.innerText = file.name;
+        const reader = new FileReader();
+
+        reader.onload = function(evt) {
+            const contenu = evt.target.result;
+            const lignes = contenu.split(/\r?\n/);
+            
+            catalogue = {}; 
+            let nbStockZero = 0;
+            let nbStockActif = 0;
+            let valeurGlobaleStock = 0;
+
+            lignes.forEach(ligne => {
+                const elements = ligne.split('|');
+                
+                if (elements.length >= 8) {
+                    const code = elements[0].trim();
+                    const prixUnitaireStr = elements[1].trim();
+                    const quantiteStr = elements[2].trim();
+                    const emplacement = elements[6].trim();
+                    const libelle = elements[7].trim();
+
+                    if (code !== "") {
+                        const qte = parseInt(quantiteStr.replace(/[^0-9-]/g, '')) || 0;
+                        const prix = parseFloat(prixUnitaireStr.replace(',', '.')) || 0;
+
+                        if (qte === 0) {
+                            nbStockZero++;
+                        } else if (qte > 0) {
+                            nbStockActif++;
+                        }
+                        valeurGlobaleStock += (qte * prix);
+
+                        catalogue[code.toLowerCase()] = {
+                            code: code,
+                            prix: prix,
+                            prixAffiche: prixUnitaireStr,
+                            quantite: qte,
+                            quantiteAffichee: quantiteStr,
+                            emplacement: emplacement === "" ? "-" : emplacement,
+                            libelle: libelle === "" ? "Sans nom" : libelle
+                        };
+                    }
+                }
+            });
+
+            statZero.innerText = nbStockZero;
+            statActif.innerText = nbStockActif;
+            statValeurTotale.innerText = formaterDZD(valeurGlobaleStock);
+            
+            dashboard.style.display = 'block';
+            cameraPicker.disabled = false;
+            btnScan.disabled = false;
+            btnValiderManuel.disabled = false;
+            
+            alert("Fichier chargé avec succès ! " + Object.keys(catalogue).length + " articles importés.");
+        };
+
+        reader.readAsText(file);
+    });
+
+    // 2. FONCTION DE RECHERCHE DANS LE CATALOGUE
+    function executerRecherche(codeRecherche) {
+        // Enlève espaces et caractères spéciaux pour la recherche
+        const codeNettoye = codeRecherche.replace(/[^a-zA-Z0-9]/g, "").trim().toLowerCase();
+        
+        if (catalogue[codeNettoye]) {
+            const produitTrouve = catalogue[codeNettoye];
+            const valeurTotaleItem = produitTrouve.quantite * produitTrouve.prix;
+
+            prodLibelle.innerText = produitTrouve.libelle;
+            prodCode.innerText = produitTrouve.code;
+            prodEmplacement.innerText = produitTrouve.emplacement;
+            prodPrix.innerText = produitTrouve.prixAffiche + " DZD";
+            prodQuantite.innerText = produitTrouve.quantiteAffichee;
+            prodValeurTotale.innerText = formaterDZD(valeurTotaleItem);
+
+            resultCard.style.display = 'block';
+            resultCard.scrollIntoView({ behavior: 'smooth' });
+            
+            if(navigator.vibrate) navigator.vibrate(200);
+            return true;
+        }
+        return false;
+    }
+
+    // 3. BOUTON DE VALIDATION RECHERCHE MANUELLE
+    btnValiderManuel.addEventListener('click', function() {
+        const codeSaisi = manualCodeInput.value;
+        if (!codeSaisi.trim()) return;
+        
+        const succes = executerRecherche(codeSaisi);
+        if (!succes) {
+            alert("Le code '" + codeSaisi.toUpperCase() + "' n'existe pas dans le catalogue.");
+        }
+    });
+
+    // 4. PRÉTRAITEMENT DE L'IMAGE POUR AMÉLIORER L'OCR (Filtre Contraste B&W)
+    function optimiserImagePourOCR(imageElement, callback) {
+        const canvas = document.getElementById('preprocess-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Redimensionner raisonnablement pour accélérer l'OCR
+        const maxDim = 1000;
+        let width = imageElement.width;
+        let height = imageElement.height;
+        if (width > maxDim || height > maxDim) {
+            if (width > height) {
+                height *= maxDim / width;
+                width = maxDim;
+            } else {
+                width *= maxDim / height;
+                height = maxDim;
+            }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(imageElement, 0, 0, width, height);
+        
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+        
+        // Seuil Noir & Blanc agressif pour détacher le texte du fond
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i+1];
+            const b = data[i+2];
+            // Niveau de gris
+            const v = (0.2126 * r + 0.7152 * g + 0.0722 * b);
+            // Si plutôt clair -> Blanc, si sombre -> Noir pur (Seuil à 120)
+            const finalValue = v > 120 ? 255 : 0;
+            data[i] = finalValue;
+            data[i+1] = finalValue;
+            data[i+2] = finalValue;
+        }
+        
+        ctx.putImageData(imgData, 0, 0);
+        callback(canvas.toDataURL());
+    }
+
+    // 5. CAPTURE PHOTO & PARSING PAR OCR AMÉLIORÉ
+    cameraPicker.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        loadingDiv.style.display = 'block';
+        resultCard.style.display = 'none';
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const img = new Image();
+            img.onload = function() {
+                // Application du filtre d'amélioration de netteté
+                optimiserImagePourOCR(img, function(imageTraiteeSrc) {
+                    
+                    // Lancement de Tesseract sur l'image nettoyée
+                    Tesseract.recognize(
+                        imageTraiteeSrc,
+                        'eng',
+                        { logger: m => console.log(m) }
+                    ).then(({ data: { text } }) => {
+                        loadingDiv.style.display = 'none';
+                        
+                        // Traitement de texte robuste : on enlève les espaces erronés générés par l'appareil photo
+                        // Ex: "123 Z 123 456" devient "123Z123456"
+                        const texteUltraNettoye = text.replace(/\s+/g, '');
+                        
+                        // Expression régulière mise à jour pour chercher votre format n'importe où dans la chaîne continue
+                        const regexStrict = /\d{3}[a-zA-Z]\d{6}/gi;
+                        const correspondances = texteUltraNettoye.match(regexStrict);
+
+                        let rechercheReussie = false;
+                        let codeTrouve = "";
+
+                        if (correspondances && correspondances.length > 0) {
+                            codeTrouve = correspondances[0].toUpperCase();
+                            rechercheReussie = executerRecherche(codeTrouve);
+                        } else {
+                            // Deuxième chance : Essayer de deviner si un mot sans espace fait 10 caractères et ressemble au format
+                            const motsIndividuels = text.replace(/[^a-zA-Z0-9\s]/g, "").split(/[\s\n]+/);
+                            for (let mot of motsIndividuels) {
+                                if (mot.length === 10) {
+                                    codeTrouve = mot.toUpperCase();
+                                    rechercheReussie = executerRecherche(codeTrouve);
+                                    if (rechercheReussie) break;
+                                }
+                            }
+                        }
+
+                        // Si l'OCR a extrait quelque chose mais que le code est inexact ou pas dans la base, on le pré-remplit en haut
+                        if (!rechercheReussie) {
+                            manualCodeInput.value = codeTrouve ? codeTrouve : "";
+                            alert("L'appareil n'a pas pu identifier un code valide de manière automatique.\nLe champ de recherche manuelle en haut est prêt si vous souhaitez taper ou corriger le code.");
+                            manualCodeInput.focus();
+                        }
+
+                    }).catch(err => {
+                        loadingDiv.style.display = 'none';
+                        alert("Erreur lors de l'analyse : " + err.message);
+                    });
+                });
+            };
+            img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+</script>
+
+</body>
+</html>
